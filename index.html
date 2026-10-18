@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0" />
+<title>Potenzen zusammenfassen und umformen</title>
+<style>
+  html,body{height:100%;overflow-x:hidden;}
+  body{
+    font-family:system-ui,Arial,sans-serif;
+    background:linear-gradient(to bottom right,#f0f4ff,#e0f7fa);
+    text-align:center;margin:0;padding:20px;
+  }
+  h1,h2{color:#333;margin:10px 0;font-size:1.6em;font-weight:600;}
+  #task,#taskAddWrapper,#taskCombine{font-size:1.8em;margin:15px auto;word-wrap:break-word;display:block;}
+  #eqMarkAdd{
+    font-size:1em;margin-left:6px;color:#333;white-space:nowrap;
+    vertical-align:middle;position:relative;top:-0.1em;
+  }
+  #result,#resultAdd,#resultCombine{font-size:1.3em;margin:10px;font-weight:bold;}
+  #score,#scoreAdd,#scoreCombine{font-size:1.1em;margin:8px;color:#333;}
+  input{
+    padding:10px;font-size:1.2em;width:80%;max-width:300px;text-align:center;
+    border-radius:8px;border:1px solid #aaa;
+  }
+  input:focus{outline:none;border-color:#007bff;}
+  button{
+    background:#007bff;color:white;border:none;padding:10px 18px;
+    margin:6px;font-size:1em;border-radius:8px;cursor:pointer;
+  }
+  button:hover{background:#0056b3;}
+  hr{margin:30px auto;width:70%;border:1px solid #ccc;}
+  .shortcutButtons{margin-top:8px;}
+  .shortcutButtons button{
+    background:#e3e3e3;color:#000;border:1px solid #bbb;
+    padding:6px 10px;font-size:1.1em;
+  }
+  .shortcutButtons button:hover{background:#ccc;}
+  @media(max-width:700px){
+    .shortcutButtons button{padding:8px 14px;font-size:1.3em;}
+  }
+</style>
+</head>
+<body>
+<h1>Potenzen zusammenfassen – Plus und Minus</h1>
+<p style="margin:8px auto;max-width:600px;color:#555">Gleiche Potenzen zusammenfassen, zum Beispiel 3a² + 5a² = 8a².</p>
+<div id="scoreCombine">Aufgabe 1 von 10 – Punkte: 0</div>
+<div id="taskCombine"></div>
+<input type="text" id="answerCombine" aria-label="Lösung für Plus und Minus" placeholder="z. B. 8a² oder 8a^2" autocomplete="off" spellcheck="false"><br>
+<div id="supBtnsCombine" class="shortcutButtons"></div>
+<button id="checkBtnCombine" type="button">Prüfen</button>
+<button id="newBtnCombine" type="button">Neue Aufgabe</button>
+<p id="resultCombine" role="status" aria-live="polite"></p>
+<hr>
+<h2>Potenzen – Multiplikation, Division, Potenzieren</h2>
+<div id="score">Aufgabe 1 von 10 – Punkte: 0</div>
+<div id="task">lade...</div>
+
+<input type="text" id="answer" placeholder="Deine Lösung" autocomplete="off" spellcheck="false"><br>
+<div id="supBtns1" class="shortcutButtons"></div>
+<button id="checkBtn">Prüfen</button>
+<button id="newBtn">Neue Aufgabe</button>
+<p id="result"></p>
+
+<hr>
+
+<h2>Zehnerpotenzen</h2>
+<div id="scoreAdd">Aufgabe 1 von 10 – Punkte: 0</div>
+<div id="taskAddWrapper">
+  <span id="taskAdd">lade...</span><span id="eqMarkAdd"> = ?</span>
+</div>
+
+<input type="text" id="answerAdd" placeholder="Deine Lösung" autocomplete="off" spellcheck="false"><br>
+<div id="supBtns2" class="shortcutButtons"></div>
+<button id="checkBtnAdd">Prüfen</button>
+<button id="newBtnAdd">Neue Aufgabe</button>
+<p id="resultAdd"></p>
+
+<p style="font-size:0.8em;color:#555;margin-top:40px;">
+Diese Seite speichert keine persönlichen Daten und läuft vollständig lokal im Browser.<br>
+© 2025 Potenzentrainer für den Mathematikunterricht
+</p>
+
+<script>
+document.addEventListener("DOMContentLoaded",()=>{
+
+// ========= Hilfsfunktionen =========
+const VARS=['a','b','x','y'];
+const randomChoice=a=>a[Math.floor(Math.random()*a.length)];
+const randInt=(min,max)=>Math.floor(Math.random()*(max-min+1))+min;
+const superExp={1:"¹",2:"²",3:"³",4:"⁴",5:"⁵",6:"⁶",7:"⁷",8:"⁸",9:"⁹"};
+const expToSup=e=>superExp[e]||"";
+const normExp=s=>s.replace(/\s+/g,"").replace(/·/g,"*").replace(/:/g,"/").toLowerCase();
+const removeTrailingZeros=str=>str.replace(/(\.\d*?[1-9])0+$/,"$1").replace(/\.0*$/,"");
+
+// — sichere Umrechnung Mantisse * 10^exp → Ganzzahl-String (ohne Floats)
+function mantissaTimes10ToExpAsIntStr(mantissaStr, exp){
+  const s = String(mantissaStr);
+  const [i,f=""] = s.split(".");
+  if (f.length > exp) return null;                 // zu viele Dezimalen
+  const digits = i + f + "0".repeat(exp - f.length);
+  // führende Nullen entfernen, aber mindestens eine Ziffer lassen
+  return digits.replace(/^0+(?=\d)/,"");
+}
+
+// ========= Eingabe-Buttons =========
+function insertSymbol(target,symbol){
+  const start=target.selectionStart??target.value.length;
+  const end=target.selectionEnd??target.value.length;
+  const text=target.value;
+  target.value=text.slice(0,start)+symbol+text.slice(end);
+  const pos=start+symbol.length;
+  requestAnimationFrame(()=>{target.focus();target.selectionStart=target.selectionEnd=pos;});
+}
+function makeSupButtons(containerId,inputEl,includeMul=false){
+  const cont=document.getElementById(containerId);
+  for(let i=1;i<=9;i++){
+    const btn=document.createElement("button");
+    btn.textContent=superExp[i];
+    btn.type="button";
+    btn.onclick=()=>insertSymbol(inputEl,superExp[i]);
+    cont.appendChild(btn);
+  }
+  if(includeMul){
+    const mulBtn=document.createElement("button");
+    mulBtn.textContent="·";
+    mulBtn.type="button";
+    mulBtn.onclick=()=>insertSymbol(inputEl,"·");
+    cont.appendChild(mulBtn);
+  }
+}
+
+// ========= Oberer Bereich: gleichartige Potenzen addieren/subtrahieren =========
+const combine={task:document.getElementById('taskCombine'),answer:document.getElementById('answerCombine'),check:document.getElementById('checkBtnCombine'),next:document.getElementById('newBtnCombine'),result:document.getElementById('resultCombine'),score:document.getElementById('scoreCombine')};
+makeSupButtons('supBtnsCombine',combine.answer,false);
+let combineRound=1,combinePoints=0,combineChecked=false,combineFinished=false,combineExpected='',combineExplanation='';
+const superscriptDigits={'⁰':'0','¹':'1','²':'2','³':'3','⁴':'4','⁵':'5','⁶':'6','⁷':'7','⁸':'8','⁹':'9'};
+function normalizeCombine(value){return value.trim().toLowerCase().replace(/−/g,'-').replace(/\s+/g,'').replace(/[⁰¹²³⁴⁵⁶⁷⁸⁹]+/g,x=>'^'+[...x].map(c=>superscriptDigits[c]).join('')).replace(/[·*]/g,'').replace(/^\+/,'').replace(/^([+-]?)1(?=[abxy])/,'$1');}
+function combineTerm(c,base,exp){if(c===0)return '0';return (c===-1?'−':c===1?'':String(c))+base+expToSup(exp);}
+function nextCombine(){if(combineFinished){combineRound=1;combinePoints=0;combineFinished=false;}else if(combineChecked){combineRound++;}if(combineRound>10){combineFinished=true;combineChecked=true;combine.task.innerText='Übungsrunde fertig!';combine.score.innerText='10 Aufgaben abgeschlossen';combine.result.style.color='green';combine.result.innerText=`Endstand: ${combinePoints}/10 Punkte.`;combine.answer.disabled=true;combine.check.disabled=true;combine.next.textContent='Neue Runde';return;}combineChecked=false;combine.answer.disabled=false;combine.check.disabled=false;combine.answer.value='';combine.result.innerText='';combine.next.textContent='Neue Aufgabe';let base=randomChoice(VARS),exp=randInt(2,5),a=randInt(1,9),b=randInt(1,9),add=Math.random()<0.5,c=add?a+b:a-b;combineExpected=combineTerm(c,base,exp);combine.task.innerText=`${combineTerm(a,base,exp)} ${add?'+':'−'} ${combineTerm(b,base,exp)} = ?`;combineExplanation=`${a} ${add?'+':'−'} ${b} = ${c}. Die Potenz ${base}${expToSup(exp)} bleibt gleich.`;combine.score.innerText=`Aufgabe ${combineRound} von 10 – Punkte: ${combinePoints}`;combine.answer.focus();}
+function checkCombine(){if(combineChecked||combineFinished)return;let value=combine.answer.value.trim();if(!value){combine.result.style.color='gray';combine.result.innerText='Bitte gib eine Lösung ein.';return;}combineChecked=true;const ok=normalizeCombine(value)===normalizeCombine(combineExpected);if(ok)combinePoints++;combine.result.style.color=ok?'green':'red';combine.result.innerText=ok?'Richtig!':`Richtig wäre ${combineExpected}. ${combineExplanation}`;combine.check.disabled=true;combine.answer.disabled=true;combine.score.innerText=`Aufgabe ${combineRound} von 10 – Punkte: ${combinePoints}`;combine.next.textContent=combineRound===10?'Auswertung':'Weiter';combine.next.focus();}
+combine.check.onclick=checkCombine;combine.next.onclick=nextCombine;combine.answer.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();checkCombine();}};nextCombine();
+
+// ========= Teil 1 (Potenzen) =========
+const taskEl=document.getElementById("task");
+const answerEl=document.getElementById("answer");
+const checkBtn=document.getElementById("checkBtn");
+const newBtn=document.getElementById("newBtn");
+const resultEl=document.getElementById("result");
+const scoreEl=document.getElementById("score");
+makeSupButtons("supBtns1",answerEl,false);
+
+let correctSolution="",round=1,score=0,totalRounds=10,powerChecked=false;
+
+function createPowMultiply(){
+  const base=randomChoice(VARS);
+  const e1=randInt(1,5),e2=randInt(1,5);
+  const res=e1+e2;if(res>9)return createPowMultiply();
+  correctSolution=`${base}${expToSup(res)}`;
+  const show1=e1===1?base:`${base}${expToSup(e1)}`;
+  const show2=e2===1?base:`${base}${expToSup(e2)}`;
+  return `${show1} · ${show2} = ?`;
+}
+function createPowDivide(){
+  const base = randomChoice(VARS);
+  const e1 = randInt(2, 9);
+  const e2 = randInt(1, e1 - 1);
+  const res = e1 - e2;
+  if (res > 9) return createPowDivide();
+
+  // Ergebnisformatierung:
+  // res = 0 → "1", res = 1 → "a", sonst "a²" etc.
+  if (res === 0) correctSolution = "1";
+  else if (res === 1) correctSolution = base;
+  else correctSolution = `${base}${expToSup(res)}`;
+
+  const show1 = e1 === 1 ? base : `${base}${expToSup(e1)}`;
+  const show2 = e2 === 1 ? base : `${base}${expToSup(e2)}`;
+  return `${show1} : ${show2} = ?`;
+}
+
+function createPowOfPow(){
+  const base=randomChoice(VARS);
+  const e1=randInt(1,4),e2=randInt(2,3);
+  const res=e1*e2;if(res>9)return createPowOfPow();
+  correctSolution=`${base}${expToSup(res)}`;
+  // hier KEIN Weglassen von ¹
+  return `(${base}${expToSup(e1)})${expToSup(e2)} = ?`;
+}
+function newTask(){
+  powerChecked=false;checkBtn.disabled=false;answerEl.disabled=false;newBtn.textContent="Neue Aufgabe";
+  resultEl.innerText="";answerEl.value="";
+  if(round>totalRounds){
+    taskEl.innerText="🎉 Übungsrunde fertig!";
+    resultEl.style.color="green";
+    resultEl.innerText=`Endstand: ${score}/${totalRounds} Punkte.`;
+    newBtn.textContent="Neue Runde";round=1;score=0;powerChecked=true;checkBtn.disabled=true;answerEl.disabled=true;return;
+  }
+  const r=Math.random();
+  let aufgabe;
+  if(r<0.4)aufgabe=createPowMultiply();
+  else if(r<0.8)aufgabe=createPowDivide();
+  else aufgabe=createPowOfPow();
+  taskEl.innerText=aufgabe;
+  scoreEl.innerText=`Aufgabe ${round} von ${totalRounds} – Punkte: ${score}`;
+}
+function checkAnswer() {
+  if(powerChecked)return;
+  const input = answerEl.value.trim();
+  if (!input) {
+    resultEl.style.color = "gray";
+    resultEl.innerText = "Bitte gib eine Lösung ein.";
+    return;
+  }
+
+  powerChecked=true;checkBtn.disabled=true;answerEl.disabled=true;
+  const normIn = normExp(input);
+  const normSol = normExp(correctSolution);
+
+  // Entfernt nur ^1 bzw. ¹ zur Toleranzprüfung
+  const stripPow1 = s => s.replace(/\^1/g, "").replace(/¹/g, "");
+
+  let equal = false;
+
+  // 🔹 Wenn die richtige Lösung nur eine Variable ist (z. B. "a", "b", "x", "y"):
+  // dann darf KEIN a¹ als richtig gelten!
+  if (VARS.includes(normSol)) {
+    equal = (normIn === normSol); // nur exakter Treffer erlaubt
+  } else {
+    // 🔹 in allen anderen Fällen darf ^1 oder ¹ weggelassen werden
+    equal = (normIn === normSol) || (stripPow1(normIn) === stripPow1(normSol));
+  }
+
+  if (equal) {
+    resultEl.style.color = "green";
+    resultEl.innerText = "✅ Richtig!";
+    score++;
+  } else {
+    resultEl.style.color = "red";
+    resultEl.innerText = `❌ Falsch! Richtig: ${correctSolution}`;
+  }
+
+  round++;
+  scoreEl.innerText = `Aufgabe ${Math.min(round, totalRounds)} von ${totalRounds} – Punkte: ${score}`;
+}
+
+
+// ▶ Event-Handler + erster Start (fehlten zuvor)
+checkBtn.onclick=checkAnswer;
+newBtn.onclick=newTask;
+answerEl.onkeydown=e=>{if(e.key==="Enter")checkAnswer();};
+newTask();
+
+// ========= Teil 2 (Zehnerpotenzen & Gleitkomma) =========
+const taskAdd=document.getElementById("taskAdd");
+const resultAdd=document.getElementById("resultAdd");
+const checkBtnAdd=document.getElementById("checkBtnAdd");
+const newBtnAdd=document.getElementById("newBtnAdd");
+const scoreAdd=document.getElementById("scoreAdd");
+const answerAdd=document.getElementById("answerAdd");
+makeSupButtons("supBtns2",answerAdd,true);
+
+let correctAdd="",pointsAdd=0,roundAdd=1,totalAdd=10,conversionChecked=false;
+let toggleDir=false; // Richtung abwechselnd
+
+function formatSci(mant,exp){
+  const mStr=removeTrailingZeros(String(mant).replace('.',','));
+  return `${mStr} · 10${superExp[exp]}`;
+}
+
+function createConversionTask() {
+  const exp=randInt(2,9);
+  const power='10'+superExp[exp];
+  const value='1'+'0'.repeat(exp);
+  const toPower=toggleDir;
+  toggleDir=!toggleDir;
+  correctAdd=toPower?power:value;
+  return toPower?value:power;
+}
+
+
+function normalizeNum(s){
+  return s.trim().replace(/\s+/g,'').replace(/[⁰¹²³⁴⁵⁶⁷⁸⁹]+/g,x=>'^'+[...x].map(c=>superscriptDigits[c]).join(''));
+}
+function checkAdditionAnswer(){
+  if(conversionChecked)return;
+  const input=answerAdd.value.trim();
+  if(!input){resultAdd.style.color="gray";resultAdd.innerText="Bitte gib eine Lösung ein.";return;}
+  conversionChecked=true;checkBtnAdd.disabled=true;answerAdd.disabled=true;
+  const a=normExp(normalizeNum(input));
+  const b=normExp(normalizeNum(correctAdd));
+  if(a===b){ resultAdd.style.color="green";resultAdd.innerText="✅ Richtig!";pointsAdd++; }
+  else{ resultAdd.style.color="red";resultAdd.innerText=`❌ Falsch! Richtig: ${correctAdd}`; }
+  roundAdd++;
+  scoreAdd.innerText=`Aufgabe ${Math.min(roundAdd,totalAdd)} von ${totalAdd} – Punkte: ${pointsAdd}`;
+}
+function newAdditionTask(){
+  conversionChecked=false;checkBtnAdd.disabled=false;answerAdd.disabled=false;newBtnAdd.textContent="Neue Aufgabe";
+  resultAdd.innerText="";answerAdd.value="";
+  if(roundAdd>totalAdd){
+    taskAdd.innerText="🎉 Übungsrunde fertig!";
+    resultAdd.style.color="green";
+    resultAdd.innerText=`Endstand: ${pointsAdd}/${totalAdd} Punkte.`;
+    newBtnAdd.textContent="Neue Runde";roundAdd=1;pointsAdd=0;conversionChecked=true;checkBtnAdd.disabled=true;answerAdd.disabled=true;return;
+  }
+  const aufgabe=createConversionTask();
+  taskAdd.innerText=aufgabe;
+  scoreAdd.innerText=`Aufgabe ${roundAdd} von ${totalAdd} – Punkte: ${pointsAdd}`;
+}
+checkBtnAdd.onclick=checkAdditionAnswer;
+newBtnAdd.onclick=newAdditionTask;
+answerAdd.onkeydown=e=>{if(e.key==="Enter")checkAdditionAnswer();};
+newAdditionTask();
+
+});
+</script>
+</body>
+</html>
